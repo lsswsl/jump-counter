@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ff6b6b">
+    <title>AI跳绳计数器 Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        /* ===== CSS Reset & Design System ===== */
+        :root {
+            --primary: #ff6b6b;
+            --primary-dark: #ee5a5a;
+            --secondary: #667eea;
+            --accent: #f093fb;
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --text: #2d3436;
+            --text-secondary: #636e72;
+            --border: #dfe6e9;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --danger: #d63031;
+            --shadow: 0 4px 20px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.12);
+            --radius: clamp(12px, 4vw, 16px);
+            --radius-sm: clamp(8px, 3vw, 12px);
+            --font-xs: clamp(10px, 2.6vw, 12px);
+            --font-sm: clamp(11px, 2.8vw, 13px);
+            --font-base: clamp(13px, 3.4vw, 16px);
+            --font-md: clamp(14px, 3.8vw, 18px);
+            --font-lg: clamp(18px, 5vw, 24px);
+            --font-xl: clamp(24px, 7vw, 32px);
+            --font-2xl: clamp(28px, 8vw, 40px);
+            --font-3xl: clamp(36px, 10vw, 56px);
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --nav-height: clamp(56px, 14vw, 64px);
+        }
+
+        [data-theme="dark"] {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --text: #eee;
+            --text-secondary: #a0a0a0;
+            --border: #0f3460;
+            --shadow: 0 4px 20px rgba(0,0,0,0.3);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        /* iOS safe-area fallback for older devices */
+        @supports not (padding-top: env(safe-area-inset-top)) {
+            :root { --safe-top: 20px; --safe-bottom: 0px; }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            -webkit-text-size-adjust: 100%;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ===== App Shell ===== */
+        #app { height: 100%; display: flex; flex-direction: column; }
+        .page {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+            animation: fadeIn 0.3s ease;
+            padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: none;
+        }
+        .page.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== Bottom Navigation ===== */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(var(--nav-height) + var(--safe-bottom));
+            padding-bottom: var(--safe-bottom);
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(2px, 1vw, 4px);
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            font-size: var(--font-xs);
+            border: none;
+            background: none;
+            padding: clamp(4px, 1.5vw, 8px);
+            min-height: 44px; /* iOS minimum tap target */
+        }
+        .nav-item .icon { font-size: clamp(18px, 5.5vw, 24px); transition: transform 0.2s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item.active .icon { transform: translateY(-2px) scale(1.05); }
+
+        /* ===== Header ===== */
+        .app-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: clamp(12px, 3.5vw, 16px);
+            padding-top: calc(clamp(12px, 3.5vw, 16px) + var(--safe-top));
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .app-header h1 { font-size: var(--font-lg); font-weight: 700; text-align: center; }
+        .app-header .subtitle { font-size: var(--font-xs); opacity: 0.9; text-align: center; margin-top: 4px; }
+
+        /* ===== Cards ===== */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            margin: clamp(8px, 2.5vw, 12px);
+            padding: clamp(12px, 3.5vw, 16px);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:active { transform: scale(0.98); }
+
+        /* ===== Stats Overview ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(8px, 2.5vw, 12px);
+            margin: clamp(8px, 2.5vw, 12px);
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: clamp(12px, 3vw, 16px) clamp(4px, 1.5vw, 8px);
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+        .stat-card:active { transform: scale(0.95); }
+        .stat-card .value { font-size: var(--font-xl); font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-card .label { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 4px; }
+
+        /* ===== Training Page ===== */
+        .video-section {
+            position: relative;
+            width: 100%;
+            background: #000;
+            aspect-ratio: 3/4;
+            overflow: hidden;
+            max-height: clamp(320px, 70vh, 500px);
+        }
+        @media (min-height: 800px) {
+            .video-section { aspect-ratio: 3/4; max-height: 60vh; }
+        }
+        @media (max-height: 600px) {
+            .video-section { aspect-ratio: 4/3; max-height: 50vh; }
+        }
+        @media (orientation: landscape) {
+            .video-section { aspect-ratio: 16/9; max-height: 70vh; }
+        }
+        #video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 1;
+            display: block;
+        }
+        #output-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 2;
+            background: transparent !important;
+            pointer-events: none;
+        }
+        .overlay-ui {
+            position: absolute;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .overlay-top {
+            top: clamp(6px, 2vw, 12px);
+            left: clamp(6px, 2vw, 12px);
+            right: clamp(6px, 2vw, 12px);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .count-pill {
+            background: rgba(255, 107, 107, 0.95);
+            color: white;
+            padding: clamp(6px, 2vw, 10px) clamp(12px, 3.5vw, 20px);
+            border-radius: 24px;
+            font-size: clamp(22px, 7vw, 30px);
+            font-weight: 800;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+        .timer-pill {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: clamp(6px, 2vw, 8px) clamp(10px, 2.5vw, 14px);
+            border-radius: 16px;
+            font-size: clamp(14px, 4.5vw, 18px);
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .overlay-bottom {
+            bottom: clamp(6px, 2vw, 12px);
+            left: clamp(6px, 2vw, 12px);
+            right: clamp(6px, 2vw, 12px);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .calorie-pill {
+            background: rgba(0, 184, 148, 0.9);
+            color: white;
+            padding: clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px);
+            border-radius: 12px;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            max-width: 50%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pose-status {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: clamp(4px, 1.5vw, 6px) clamp(8px, 2.5vw, 12px);
+            border-radius: 12px;
+            font-size: var(--font-xs);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        /* ===== Start Overlay ===== */
+        .start-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            background: rgba(0,0,0,0.3);
+        }
+        .silhouette-box {
+            width: clamp(100px, 35vw, 140px);
+            height: clamp(180px, 65vw, 260px);
+            border: 2px dashed rgba(255,255,255,0.5);
+            border-radius: clamp(50px, 17vw, 70px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: clamp(12px, 4vw, 20px);
+            animation: pulse-border 2s ease-in-out infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(255,255,255,0.3); }
+            50% { border-color: rgba(255,255,255,0.8); }
+        }
+        .silhouette-box svg { width: 80%; opacity: 0.7; }
+        .overlay-hint {
+            color: white;
+            font-size: clamp(14px, 4vw, 16px);
+            font-weight: 600;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            animation: fadeInOut 2s ease-in-out infinite;
+        }
+
+        /* ===== Mode Selector ===== */
+        .mode-selector {
+            display: flex;
+            gap: clamp(6px, 1.5vw, 8px);
+            padding: clamp(8px, 2.5vw, 12px);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .mode-selector::-webkit-scrollbar { display: none; }
+        .mode-chip {
+            flex-shrink: 0;
+            padding: clamp(8px, 2.5vw, 10px) clamp(14px, 4vw, 20px);
+            border-radius: 24px;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            color: var(--text-secondary);
+            font-size: var(--font-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: clamp(4px, 1.2vw, 6px);
+            white-space: nowrap;
+            min-height: 44px;
+        }
+        .mode-chip.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+        }
+
+        /* ===== Training Settings ===== */
+        .training-settings {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: clamp(12px, 3vw, 16px);
+            padding: clamp(12px, 3vw, 16px);
+            background: var(--surface);
+        }
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: clamp(8px, 2.5vw, 12px);
+        }
+        .setting-btn {
+            width: clamp(36px, 10vw, 44px);
+            height: clamp(36px, 10vw, 44px);
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            font-size: clamp(16px, 4.5vw, 20px);
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            min-width: 44px;
+            min-height: 44px;
+        }
+        .setting-btn:active { background: var(--primary); color: white; border-color: var(--primary); }
+        .setting-value {
+            font-size: clamp(24px, 7vw, 32px);
+            font-weight: 800;
+            color: var(--text);
+            min-width: clamp(60px, 18vw, 80px);
+            text-align: center;
+        }
+
+        /* ===== Action Buttons ===== */
+        .action-bar {
+            padding: clamp(12px, 3vw, 16px);
+            background: var(--surface);
+            display: flex;
+            gap: clamp(8px, 2.5vw, 12px);
+        }
+        .btn {
+            flex: 1;
+            padding: clamp(12px, 3.5vw, 16px);
+            border: none;
+            border-radius: var(--radius);
+            font-size: var(--font-base);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 48px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+        }
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+        /* ===== Countdown ===== */
+        .countdown-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .countdown-overlay.active { display: flex; }
+        .countdown-num {
+            font-size: clamp(64px, 25vw, 100px);
+            font-weight: 900;
+            color: var(--primary);
+            animation: countPulse 0.8s ease-out;
+        }
+        @keyframes countPulse {
+            0% { transform: scale(2); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .countdown-text { font-size: clamp(16px, 5vw, 20px); color: white; margin-top: clamp(12px, 3vw, 16px); }
+
+        /* ===== Result Modal ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: clamp(16px, 4vw, 20px);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: min(380px, 90vw);
+            padding: clamp(24px, 6vw, 32px) clamp(16px, 5vw, 24px);
+            text-align: center;
+            animation: slideUp 0.4s ease;
+            box-shadow: var(--shadow-lg);
+        }
+        .modal-icon { font-size: clamp(48px, 15vw, 64px); margin-bottom: 12px; }
+        .modal-title { font-size: var(--font-lg); font-weight: 800; color: var(--text); margin-bottom: 8px; }
+        .modal-subtitle { font-size: var(--font-sm); color: var(--text-secondary); margin-bottom: clamp(16px, 4vw, 24px); }
+        .result-big {
+            font-size: clamp(48px, 16vw, 64px);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: clamp(12px, 3vw, 16px) 0;
+        }
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(8px, 2.5vw, 12px);
+            margin: clamp(12px, 4vw, 20px) 0;
+        }
+        .result-item { text-align: center; }
+        .result-item .value { font-size: clamp(16px, 5vw, 20px); font-weight: 700; color: var(--text); }
+        .result-item .label { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 4px; }
+        .modal-actions { display: flex; gap: clamp(8px, 2.5vw, 12px); margin-top: clamp(16px, 4vw, 24px); }
+
+        /* ===== History Page ===== */
+        .history-list { padding: 0 clamp(8px, 2.5vw, 12px); }
+        .history-item {
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: clamp(12px, 3vw, 16px);
+            margin-bottom: clamp(6px, 2vw, 10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+        .history-item:active { transform: scale(0.98); }
+        .history-info .date { font-size: var(--font-sm); color: var(--text-secondary); }
+        .history-info .mode-badge {
+            display: inline-block;
+            padding: 2px clamp(6px, 1.5vw, 8px);
+            border-radius: 6px;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .mode-timer { background: #e3f2fd; color: #1976d2; }
+        .mode-count { background: #f3e5f5; color: #7b1fa2; }
+        .mode-free { background: #e8f5e9; color: #388e3c; }
+        .history-stats { text-align: right; }
+        .history-stats .count { font-size: clamp(18px, 5.5vw, 22px); font-weight: 800; color: var(--primary); }
+        .history-stats .meta { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 2px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+        .empty-state .icon { font-size: clamp(48px, 15vw, 64px); margin-bottom: 16px; opacity: 0.5; }
+
+        /* ===== Stats Page ===== */
+        .chart-container {
+            background: var(--surface);
+            border-radius: var(--radius);
+            margin: clamp(8px, 2.5vw, 12px);
+            padding: clamp(12px, 3vw, 16px);
+            box-shadow: var(--shadow);
+        }
+        .chart-title { font-size: var(--font-base); font-weight: 700; margin-bottom: 12px; color: var(--text); }
+        .chart-canvas { width: 100%; height: clamp(160px, 40vw, 200px); }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(8px, 2.5vw, 12px);
+            margin: clamp(8px, 2.5vw, 12px);
+        }
+        .stat-box {
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: clamp(12px, 3vw, 16px);
+            box-shadow: var(--shadow);
+        }
+        .stat-box .label { font-size: var(--font-xs); color: var(--text-secondary); }
+        .stat-box .value { font-size: var(--font-xl); font-weight: 800; color: var(--text); margin-top: 4px; }
+        .stat-box .change { font-size: var(--font-xs); margin-top: 4px; font-weight: 600; }
+        .change.up { color: var(--success); }
+        .change.down { color: var(--danger); }
+
+        /* ===== Profile Page ===== */
+        .profile-header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: clamp(24px, 7vw, 32px) clamp(16px, 5vw, 24px);
+            text-align: center;
+            border-radius: 0 0 var(--radius) var(--radius);
+        }
+        .avatar {
+            width: clamp(64px, 20vw, 80px);
+            height: clamp(64px, 20vw, 80px);
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto clamp(12px, 3vw, 16px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(28px, 9vw, 36px);
+            border: 3px solid rgba(255,255,255,0.3);
+        }
+        .profile-name { font-size: clamp(18px, 5vw, 20px); font-weight: 700; }
+        .profile-meta { font-size: var(--font-sm); opacity: 0.9; margin-top: 4px; }
+        .form-group {
+            margin: clamp(8px, 2.5vw, 12px);
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: clamp(12px, 3vw, 16px);
+            box-shadow: var(--shadow);
+        }
+        .form-label { font-size: var(--font-sm); font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; display: block; }
+        .form-input {
+            width: 100%;
+            padding: clamp(10px, 3vw, 12px) clamp(12px, 3.5vw, 16px);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-base);
+            background: var(--bg);
+            color: var(--text);
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .form-input:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 2.5vw, 12px); }
+        .segmented-control {
+            display: flex;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+        }
+        .segment {
+            flex: 1;
+            padding: clamp(8px, 2.5vw, 10px);
+            text-align: center;
+            border-radius: 8px;
+            font-size: var(--font-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+        }
+        .segment.active { background: var(--surface); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        /* ===== Settings Page ===== */
+        .settings-group { margin: clamp(8px, 2.5vw, 12px); background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+        .settings-item { display: flex; justify-content: space-between; align-items: center; padding: clamp(12px, 3.5vw, 16px); border-bottom: 1px solid var(--border); min-height: 48px; }
+        .settings-item:last-child { border-bottom: none; }
+        .settings-item .info { flex: 1; }
+        .settings-item .title { font-size: var(--font-base); font-weight: 600; color: var(--text); }
+        .settings-item .desc { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 2px; }
+        .toggle {
+            width: clamp(44px, 12vw, 50px);
+            height: clamp(26px, 7vw, 28px);
+            background: var(--border);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .toggle.active { background: var(--primary); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: clamp(22px, 6vw, 24px);
+            height: clamp(22px, 6vw, 24px);
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle.active::after { transform: translateX(clamp(18px, 5vw, 22px)); }
+
+        /* ===== Achievement Page ===== */
+        .achievement-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(8px, 2.5vw, 12px); margin: clamp(8px, 2.5vw, 12px); }
+        .achievement-card { background: var(--surface); border-radius: var(--radius-sm); padding: clamp(14px, 4vw, 20px); text-align: center; box-shadow: var(--shadow); transition: all 0.2s; opacity: 0.5; }
+        .achievement-card.unlocked { opacity: 1; }
+        .achievement-card .ach-icon { font-size: clamp(32px, 10vw, 40px); margin-bottom: 8px; filter: grayscale(100%); transition: filter 0.3s; }
+        .achievement-card.unlocked .ach-icon { filter: none; }
+        .achievement-card .ach-name { font-size: var(--font-sm); font-weight: 700; color: var(--text); }
+        .achievement-card .ach-desc { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 4px; }
+
+        /* ===== Toast ===== */
+        .toast {
+            position: fixed;
+            top: max(20px, var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: clamp(10px, 3vw, 12px) clamp(16px, 5vw, 24px);
+            border-radius: 24px;
+            font-size: var(--font-sm);
+            font-weight: 600;
+            z-index: 3000;
+            opacity: 0;
+            transition: all 0.4s;
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90vw;
+            white-space: nowrap;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* ===== Loading Overlay ===== */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .loading-spinner { width: clamp(36px, 12vw, 48px); height: clamp(36px, 12vw, 48px); border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        .loading-text { color: white; margin-top: clamp(12px, 3vw, 16px); font-size: var(--font-sm); }
+
+        /* ===== Animations ===== */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideUp { from { transform: translateY(clamp(40px, 12vw, 50px)); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeInOut { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        /* ===== Utility ===== */
+        .text-center { text-align: center; }
+        .mt-1 { margin-top: 8px; }
+        .mt-2 { margin-top: 16px; }
+        .hidden { display: none !important; }
+
+        /* ===== Small Screens (iPhone SE, < 375px) ===== */
+        @media (max-width: 374px) {
+            .stats-grid { gap: 6px; margin: 6px; }
+            .stat-card { padding: 10px 4px; }
+            .stat-card .value { font-size: var(--font-lg); }
+            .mode-chip { padding: 6px 12px; font-size: 11px; }
+            .overlay-hint { font-size: 13px; }
+            .history-item { padding: 10px; }
+            .achievement-grid { gap: 6px; margin: 6px; }
+            .achievement-card { padding: 12px; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+
+        /* ===== Large Screens (iPhone Plus / Max, tablets) ===== */
+        @media (min-width: 768px) {
+            .page { max-width: 500px; margin: 0 auto; }
+            .bottom-nav { max-width: 500px; left: 50%; transform: translateX(-50%); border-radius: 16px 16px 0 0; }
+            .mode-chip { font-size: var(--font-base); }
+        }
+
+        /* ===== iPad / Tablets ===== */
+        @media (min-width: 1024px) {
+            body { padding: 20px; }
+            .page { max-width: 500px; margin: 0 auto; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+            .bottom-nav { max-width: 500px; left: 50%; transform: translateX(-50%); }
+            .video-section { max-height: 450px; }
+        }
+
+        /* ===== Reduced motion accessibility ===== */
+        @media (prefers-reduced-motion: reduce) {
+            * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+
+        /* ===== Prevent zoom on input focus (iOS) ===== */
+        @supports (-webkit-overflow-scrolling: touch) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
+
+        <!-- ========== TRAINING PAGE ========== -->
+        <div class="page active" id="page-training">
+            <div class="app-header">
+                <h1>AI跳绳计数器 Pro</h1>
+                <div class="subtitle" id="training-subtitle">智能识别 · 专业计数</div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="value" id="today-count">0</div>
+                    <div class="label">今日</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="streak-days">0</div>
+                    <div class="label">连续天数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="total-calories">0</div>
+                    <div class="label">卡路里</div>
+                </div>
+            </div>
+
+            <!-- Mode Selector -->
+            <div class="mode-selector" id="mode-selector">
+                <div class="mode-chip active" data-mode="timer">
+                    <span>⏱️</span> 定时模式
+                </div>
+                <div class="mode-chip" data-mode="count">
+                    <span>🎯</span> 定数模式
+                </div>
+                <div class="mode-chip" data-mode="free">
+                    <span>🔥</span> 自由模式
+                </div>
+                <div class="mode-chip" data-mode="interval">
+                    <span>⚡</span> 间歇模式
+                </div>
+            </div>
+
+            <!-- Video Section -->
+            <div class="video-section" id="video-section">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="output-canvas"></canvas>
+
+                <!-- Overlays -->
+                <div class="overlay-ui overlay-top">
+                    <div class="count-pill" id="count-pill">0</div>
+                    <div class="timer-pill" id="timer-pill">01:00</div>
+                </div>
+                <div class="overlay-ui overlay-bottom">
+                    <div class="calorie-pill" id="calorie-pill">🔥 0 千卡</div>
+                    <div class="pose-status" id="pose-status">准备就绪</div>
+                </div>
+
+                <!-- Start Overlay -->
+                <div class="start-overlay" id="start-overlay">
+                    <div class="silhouette-box">
+                        <svg viewBox="0 0 100 200" fill="white">
+                            <ellipse cx="50" cy="30" rx="18" ry="20"/>
+                            <rect x="35" y="50" width="30" height="45" rx="10"/>
+                            <path d="M35 55 L15 100" stroke="white" stroke-width="10" stroke-linecap="round"/>
+                            <path d="M65 55 L85 100" stroke="white" stroke-width="10" stroke-linecap="round"/>
+                            <path d="M40 95 L35 170" stroke="white" stroke-width="12" stroke-linecap="round"/>
+                            <path d="M60 95 L65 170" stroke="white" stroke-width="12" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="overlay-hint">请全身进入屏幕区域</div>
+                </div>
+
+                <!-- Loading -->
+                <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">加载AI模型中...</div>
+                </div>
+
+                <!-- Countdown -->
+                <div class="countdown-overlay" id="countdown-overlay">
+                    <div class="countdown-num" id="countdown-num">3</div>
+                    <div class="countdown-text" id="countdown-text">准备开始</div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="training-settings" id="training-settings">
+                <div class="setting-control" id="timer-control">
+                    <button class="setting-btn" id="time-minus">−</button>
+                    <div class="setting-value" id="time-value">1:00</div>
+                    <button class="setting-btn" id="time-plus">+</button>
+                </div>
+                <div class="setting-control hidden" id="count-control">
+                    <button class="setting-btn" id="count-minus">−</button>
+                    <div class="setting-value" id="count-value">100</div>
+                    <button class="setting-btn" id="count-plus">+</button>
+                </div>
+                <div class="setting-control hidden" id="interval-control">
+                    <div style="text-align:center">
+                        <div style="font-size:12px;color:var(--text-secondary)">运动/休息</div>
+                        <div style="font-size:20px;font-weight:700" id="interval-value">30/10</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-bar">
+                <button class="btn btn-primary" id="start-btn">▶ 开始训练</button>
+                <button class="btn btn-secondary" id="reset-btn" disabled>↺ 重置</button>
+            </div>
+        </div>
+
+        <!-- ========== HISTORY PAGE ========== -->
+        <div class="page" id="page-history">
+            <div class="app-header">
+                <h1>训练记录</h1>
+                <div class="subtitle">回顾每一次进步</div>
+            </div>
+            <div id="history-content">
+                <div class="empty-state">
+                    <div class="icon">📋</div>
+                    <div>暂无训练记录</div>
+                    <div class="mt-1" style="font-size:13px">完成第一次训练后将在这里显示</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== STATS PAGE ========== -->
+        <div class="page" id="page-stats">
+            <div class="app-header">
+                <h1>数据统计</h1>
+                <div class="subtitle">可视化你的成长</div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-box">
+                    <div class="label">总跳绳次数</div>
+                    <div class="value" id="stat-total">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">总训练时长</div>
+                    <div class="value" id="stat-duration">0h</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">总消耗热量</div>
+                    <div class="value" id="stat-calories">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">平均频率</div>
+                    <div class="value" id="stat-rate">0</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📈 最近7天趋势</div>
+                <canvas id="trend-chart" class="chart-canvas"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 训练时段分布</div>
+                <canvas id="hour-chart" class="chart-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- ========== ACHIEVEMENTS PAGE ========== -->
+        <div class="page" id="page-achievements">
+            <div class="app-header">
+                <h1>成就中心</h1>
+                <div class="subtitle">挑战自我，解锁成就</div>
+            </div>
+            <div class="achievement-grid" id="achievement-grid"></div>
+        </div>
+
+        <!-- ========== PROFILE PAGE ========== -->
+        <div class="page" id="page-profile">
+            <div class="profile-header">
+                <div class="avatar" id="profile-avatar">👤</div>
+                <div class="profile-name" id="profile-name">运动达人</div>
+                <div class="profile-meta" id="profile-meta">设置个人信息以计算卡路里</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">昵称</label>
+                <input type="text" class="form-input" id="input-nickname" placeholder="输入你的昵称">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">性别</label>
+                <div class="segmented-control">
+                    <button class="segment active" data-gender="male">男</button>
+                    <button class="segment" data-gender="female">女</button>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="margin:0">
+                    <label class="form-label">身高 (cm)</label>
+                    <input type="number" class="form-input" id="input-height" placeholder="170" value="170">
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label class="form-label">体重 (kg)</label>
+                    <input type="number" class="form-input" id="input-weight" placeholder="65" value="65">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">年龄</label>
+                <input type="number" class="form-input" id="input-age" placeholder="25" value="25">
+            </div>
+
+            <div style="padding: 12px;">
+                <button class="btn btn-primary" id="save-profile" style="width:100%">保存资料</button>
+            </div>
+
+            <div class="settings-group" style="margin-top: 20px;">
+                <div class="settings-item" id="goto-settings" style="cursor:pointer">
+                    <div class="info">
+                        <div class="title">⚙️ 应用设置</div>
+                        <div class="desc">暗色模式、声音、振动等</div>
+                    </div>
+                    <span style="color:var(--text-secondary);font-size:18px">›</span>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">导出数据</div>
+                        <div class="desc">将所有训练记录导出为JSON文件</div>
+                    </div>
+                    <button class="btn btn-secondary" id="export-data" style="flex:0;padding:8px 16px;font-size:13px">导出</button>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">清空记录</div>
+                        <div class="desc">删除所有训练记录（不可恢复）</div>
+                    </div>
+                    <button class="btn btn-secondary" id="clear-data" style="flex:0;padding:8px 16px;font-size:13px;background:var(--danger);color:white">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SETTINGS PAGE ========== -->
+        <div class="page" id="page-settings">
+            <div class="app-header">
+                <h1>设置</h1>
+                <div class="subtitle">个性化你的体验</div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">暗色模式</div>
+                        <div class="desc">切换深色主题保护眼睛</div>
+                    </div>
+                    <div class="toggle" id="toggle-dark"></div>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">声音反馈</div>
+                        <div class="desc">每次跳跃播放提示音</div>
+                    </div>
+                    <div class="toggle active" id="toggle-sound"></div>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">语音播报</div>
+                        <div class="desc">每10次播报当前计数</div>
+                    </div>
+                    <div class="toggle active" id="toggle-voice"></div>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">振动反馈</div>
+                        <div class="desc">跳跃时振动（需设备支持）</div>
+                    </div>
+                    <div class="toggle active" id="toggle-vibrate"></div>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">屏幕常亮</div>
+                        <div class="desc">训练时保持屏幕唤醒</div>
+                    </div>
+                    <div class="toggle active" id="toggle-wakelock"></div>
+                </div>
+                <div class="settings-item">
+                    <div class="info">
+                        <div class="title">姿势提示</div>
+                        <div class="desc">实时显示姿势质量评估</div>
+                    </div>
+                    <div class="toggle active" id="toggle-pose-hint"></div>
+                </div>
+            </div>
+
+            <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:12px">
+                AI跳绳计数器 Pro v2.0<br>
+                基于 MediaPipe Pose 技术
+            </div>
+        </div>
+
+        <!-- Result Modal -->
+        <div class="modal-overlay" id="result-modal">
+            <div class="modal-card">
+                <div class="modal-icon" id="result-icon">🎉</div>
+                <div class="modal-title" id="result-title">训练完成!</div>
+                <div class="modal-subtitle" id="result-subtitle">太棒了，继续保持!</div>
+                <div class="result-big" id="result-count">0</div>
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="value" id="result-time">00:00</div>
+                        <div class="label">用时</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="value" id="result-rate">0</div>
+                        <div class="label">频率/分</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="value" id="result-cal">0</div>
+                        <div class="label">千卡</div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="result-close">关闭</button>
+                    <button class="btn btn-primary" id="result-restart">再来一次</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-page="training">
+                <span class="icon">🏠</span>
+                <span>训练</span>
+            </button>
+            <button class="nav-item" data-page="history">
+                <span class="icon">📋</span>
+                <span>记录</span>
+            </button>
+            <button class="nav-item" data-page="stats">
+                <span class="icon">📊</span>
+                <span>统计</span>
+            </button>
+            <button class="nav-item" data-page="achievements">
+                <span class="icon">🏆</span>
+                <span>成就</span>
+            </button>
+            <button class="nav-item" data-page="profile">
+                <span class="icon">👤</span>
+                <span>我的</span>
+            </button>
+        </nav>
+    </div>
+
+    <script>
+        // ==================== App State ====================
+        const AppState = {
+            currentPage: 'training',
+            currentMode: 'timer',
+            isDetecting: false,
+            isProcessing: false,
+            stream: null,
+            pose: null,
+            count: 0,
+            targetTime: 60,
+            targetCount: 100,
+            remainingTime: 60,
+            startTime: 0,
+            timerInterval: null,
+            countdownInterval: null,
+            lastFrameTime: 0,
+            facingMode: 'environment',
+            fullBodyReady: false,
+            fullBodyFrameCount: 0,
+            settings: {
+                sound: true,
+                voice: true,
+                vibrate: true,
+                wakelock: true,
+                darkMode: false,
+                poseHint: true
+            },
+            profile: {
+                nickname: '',
+                gender: 'male',
+                height: 170,
+                weight: 65,
+                age: 25
+            },
+            achievements: []
+        };
+
+        const FULL_BODY_LANDMARKS = [0, 11, 12, 23, 24, 25, 26, 27, 28];
+        const ANKLE_THRESHOLD = 0.5;
+        const LEFT_ANKLE = 27;
+        const RIGHT_ANKLE = 28;
+
+        // ==================== DOM Elements ====================
+        const $ = id => document.getElementById(id);
+        const $$ = sel => document.querySelectorAll(sel);
+
+        // ==================== Utility ====================
+        function showToast(msg) {
+            const toast = $('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+
+        function calcCalories(count, weight) {
+            // MET value for jumping rope: ~10
+            // calories = MET * weight(kg) * time(hours) * 1.05
+            // Approx: 0.15 kcal per jump for average person
+            const perJump = 0.15 * (weight / 65);
+            return Math.round(count * perJump);
+        }
+
+        function calcBMI(h, w) {
+            const hm = h / 100;
+            return (w / (hm * hm)).toFixed(1);
+        }
+
+        // ==================== Storage ====================
+        function loadData() {
+            try {
+                const s = localStorage.getItem('jumprope_settings');
+                if (s) AppState.settings = { ...AppState.settings, ...JSON.parse(s) };
+                const p = localStorage.getItem('jumprope_profile');
+                if (p) AppState.profile = { ...AppState.profile, ...JSON.parse(p) };
+                const a = localStorage.getItem('jumprope_achievements');
+                if (a) AppState.achievements = JSON.parse(a);
+            } catch(e) {}
+        }
+
+        function saveSettings() {
+            localStorage.setItem('jumprope_settings', JSON.stringify(AppState.settings));
+        }
+
+        function saveProfile() {
+            localStorage.setItem('jumprope_profile', JSON.stringify(AppState.profile));
+        }
+
+        function getHistory() {
+            try {
+                return JSON.parse(localStorage.getItem('jump_history') || '[]');
+            } catch(e) { return []; }
+        }
+
+        function saveHistory(record) {
+            const history = getHistory();
+            history.unshift(record);
+            if (history.length > 200) history.pop();
+            localStorage.setItem('jump_history', JSON.stringify(history));
+        }
+
+        // ==================== Theme ====================
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', AppState.settings.darkMode ? 'dark' : 'light');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', AppState.settings.darkMode ? '#1a1a2e' : '#ff6b6b');
+        }
+
+        // ==================== Page Navigation ====================
+        function showPage(page) {
+            AppState.currentPage = page;
+            $$('.page').forEach(p => p.classList.remove('active'));
+            $(`page-${page}`).classList.add('active');
+            $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+
+            if (page === 'history') renderHistory();
+            if (page === 'stats') renderStats();
+            if (page === 'achievements') renderAchievements();
+            if (page === 'profile') loadProfileUI();
+        }
+
+        $$('.nav-item').forEach(item => {
+            item.addEventListener('click', () => showPage(item.dataset.page));
+        });
+
+        // ==================== Jump Counter ====================
+        class JumpCounter {
+            constructor(fps=15, minInterval=4, minAmplitude=10) {
+                this.fps = fps;
+                this.minInterval = minInterval;
+                this.minAmplitude = minAmplitude;
+                this.ankleYHistory = [];
+                this.smoothHistory = [];
+                this.count = 0;
+                this.lastCountFrame = -minInterval;
+                this.frameCount = 0;
+                this.lastValidY = null;
+                this.lastPeakY = null;
+                this.isInAir = false;
+                this.dropThreshold = minAmplitude * 0.25;
+                this.airEntryThreshold = minAmplitude * 0.3;
+                this.fallbackMultiplier = 1.5;
+                this.poseQuality = 100;
+                this.rhythmScore = 0;
+                this.jumpIntervals = [];
+            }
+
+            update(ankleY) {
+                this.frameCount++;
+                if (ankleY != null) this.lastValidY = ankleY;
+                else if (this.lastValidY != null) ankleY = this.lastValidY;
+                else return this.count;
+
+                this.ankleYHistory.push(ankleY);
+                if (this.ankleYHistory.length > 50) this.ankleYHistory.shift();
+
+                this.smoothHistory = this.movingAverage(this.ankleYHistory, 5);
+                if (this.smoothHistory.length >= 8) this.detectJumpSimple();
+
+                // Pose quality based on amplitude consistency
+                if (this.smoothHistory.length >= 10) {
+                    const recent = this.smoothHistory.slice(-20);
+                    const ranges = [];
+                    for (let i = 1; i < recent.length; i++) {
+                        ranges.push(Math.abs(recent[i] - recent[i-1]));
+                    }
+                    const avgRange = ranges.reduce((a,b) => a+b, 0) / ranges.length;
+                    this.poseQuality = Math.min(100, Math.max(30, Math.round(avgRange * 2)));
+                }
+
+                return this.count;
+            }
+
+            movingAverage(data, windowSize) {
+                if (data.length < windowSize) return [...data];
+                const result = [];
+                for (let i = 0; i < data.length; i++) {
+                    let sum = 0, cnt = 0;
+                    for (let j = -Math.floor(windowSize/2); j <= Math.floor(windowSize/2); j++) {
+                        const idx = i + j;
+                        if (idx >= 0 && idx < data.length) { sum += data[idx]; cnt++; }
+                    }
+                    result.push(sum / cnt);
+                }
+                return result;
+            }
+
+            detectJumpSimple() {
+                const len = this.smoothHistory.length;
+                const currentY = this.smoothHistory[len-1];
+                const prevY = this.smoothHistory[len-2];
+                const prev2Y = this.smoothHistory[len-3];
+
+                const recent = this.smoothHistory.slice(-12);
+                const range = Math.max(...recent) - Math.min(...recent);
+                const isGoingUp = currentY < prevY && prevY < prev2Y;
+                const isGoingDown = currentY > prevY && prevY > prev2Y;
+
+                // Enter air state on upward movement with smaller threshold
+                if (!this.isInAir && isGoingUp && range > this.airEntryThreshold) {
+                    this.isInAir = true;
+                    this.lastPeakY = null;
+                }
+
+                if (this.isInAir) {
+                    // Track the highest point (lowest Y value)
+                    if (this.lastPeakY == null || currentY < this.lastPeakY) {
+                        this.lastPeakY = currentY;
+                    }
+                    // Detect landing: downward movement after peak
+                    if (isGoingDown && this.lastPeakY != null) {
+                        const drop = currentY - this.lastPeakY;
+                        if (drop > this.dropThreshold) {
+                            const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
+                            // Count jump if drop exceeds minimum amplitude or time is sufficient
+                            if (timeOk && (drop > this.minAmplitude || this.count === 0)) {
+                                this.count++;
+                                this.lastCountFrame = this.frameCount;
+                                this.jumpIntervals.push(this.frameCount);
+                                if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
+                                onJumpDetected();
+                            }
+                            this.isInAir = false;
+                            this.lastPeakY = null;
+                        }
+                    }
+                }
+
+                // Fallback: count if stuck in air too long and peak-drop is sufficient
+                const sinceLast = this.frameCount - this.lastCountFrame;
+                if (sinceLast > this.minInterval * this.fallbackMultiplier && this.isInAir && this.lastPeakY != null) {
+                    const drop = currentY - this.lastPeakY;
+                    if (drop > this.minAmplitude * 0.8) {
+                        this.count++;
+                        this.lastCountFrame = this.frameCount;
+                        this.jumpIntervals.push(this.frameCount);
+                        if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
+                        onJumpDetected();
+                    }
+                    this.isInAir = false;
+                    this.lastPeakY = null;
+                }
+            }
+
+            reset() {
+                this.ankleYHistory = [];
+                this.smoothHistory = [];
+                this.count = 0;
+                this.lastCountFrame = -this.minInterval;
+                this.frameCount = 0;
+                this.lastValidY = null;
+                this.lastPeakY = null;
+                this.isInAir = false;
+                this.poseQuality = 100;
+                this.jumpIntervals = [];
+            }
+
+            getHistory() { return this.smoothHistory; }
+            getRhythm() {
+                if (this.jumpIntervals.length < 3) return 0;
+                const diffs = [];
+                for (let i = 1; i < this.jumpIntervals.length; i++) diffs.push(this.jumpIntervals[i] - this.jumpIntervals[i-1]);
+                const avg = diffs.reduce((a,b) => a+b, 0) / diffs.length;
+                const variance = diffs.reduce((sum, d) => sum + Math.abs(d - avg), 0) / diffs.length;
+                return Math.max(0, Math.min(100, Math.round(100 - variance * 5)));
+            }
+        }
+
+        const jumpCounter = new JumpCounter(15, 4, 10);
+
+        // ==================== Audio & Feedback ====================
+        let audioCtx = null;
+        function ensureAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playJumpSound() {
+            if (!AppState.settings.sound) return;
+            try {
+                ensureAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            } catch(e) {}
+        }
+
+        function playCompleteSound() {
+            if (!AppState.settings.sound) return;
+            try {
+                ensureAudio();
+                const notes = [523, 659, 784, 1047];
+                notes.forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.12 + 0.3);
+                    osc.start(audioCtx.currentTime + i * 0.12);
+                    osc.stop(audioCtx.currentTime + i * 0.12 + 0.3);
+                });
+            } catch(e) {}
+        }
+
+        function speakCount(num) {
+            if (!AppState.settings.voice || !('speechSynthesis' in window)) return;
+            if (num % 10 !== 0 && num !== 1 && num % 50 !== 0) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(String(num));
+            u.lang = 'zh-CN'; u.rate = 1.3; u.volume = 0.8;
+            window.speechSynthesis.speak(u);
+        }
+
+        function vibrate() {
+            if (AppState.settings.vibrate && 'vibrate' in navigator) {
+                navigator.vibrate(15);
+            }
+        }
+
+        let wakeLock = null;
+        async function acquireWakeLock() {
+            if (!AppState.settings.wakelock || !('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch(e) {}
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) {
+                try { await wakeLock.release(); } catch(e) {}
+                wakeLock = null;
+            }
+        }
+
+        function onJumpDetected() {
+            playJumpSound();
+            vibrate();
+            speakCount(jumpCounter.count);
+        }
+
+        // ==================== Pose Detection ====================
+        let poseLoadPromise = null;
+
+        function loadPoseScript() {
+            if (poseLoadPromise) return poseLoadPromise;
+            poseLoadPromise = new Promise((resolve, reject) => {
+                // Try CDNs in order
+                const cdns = [
+                    'https://unpkg.com/@mediapipe/pose/pose.js',
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.3.1620932931/pose.js'
+                ];
+                let attempt = 0;
+                function tryLoad() {
+                    if (attempt >= cdns.length) {
+                        reject(new Error('All CDNs failed'));
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = cdns[attempt];
+                    script.crossOrigin = 'anonymous';
+                    script.onload = resolve;
+                    script.onerror = () => { attempt++; tryLoad(); };
+                    document.head.appendChild(script);
+                }
+                tryLoad();
+                // Timeout after 15s
+                setTimeout(() => reject(new Error('Script load timeout')), 15000);
+            });
+        }
+
+        async function initPose() {
+            try {
+                $('loading-overlay').style.display = 'flex';
+                await loadPoseScript();
+                if (typeof Pose === 'undefined') {
+                    throw new Error('Pose not available after script load');
+                }
+                pose = new Pose({locateFile: (file) => `https://unpkg.com/@mediapipe/pose/${file}`});
+                pose.setOptions({
+                    modelComplexity: 0,
+                    smoothLandmarks: true,
+                    enableSegmentation: false,
+                    minDetectionConfidence: 0.4,
+                    minTrackingConfidence: 0.4
+                });
+                pose.onResults(onPoseResults);
+                $('loading-overlay').style.display = 'none';
+                return true;
+            } catch(err) {
+                $('loading-overlay').style.display = 'none';
+                showToast('模型加载失败，请检查网络连接');
+                return false;
+            }
+        }
+
+        function checkFullBody(landmarks) {
+            let visible = 0;
+            for (const idx of FULL_BODY_LANDMARKS) {
+                if (landmarks[idx] && landmarks[idx].visibility > ANKLE_THRESHOLD) visible++;
+            }
+            return visible >= FULL_BODY_LANDMARKS.length - 1;
+        }
+
+        function onPoseResults(results) {
+            AppState.isProcessing = false;
+            if (!AppState.isDetecting || !AppState.stream) return;
+
+            const ctx = $('output-canvas').getContext('2d');
+            ctx.save();
+            ctx.clearRect(0, 0, $('output-canvas').width, $('output-canvas').height);
+
+            if (results.poseLandmarks) {
+                drawPose(ctx, results.poseLandmarks);
+
+                const fullBody = checkFullBody(results.poseLandmarks);
+                if (fullBody) {
+                    AppState.fullBodyFrameCount++;
+                    if (AppState.fullBodyFrameCount >= 5) AppState.fullBodyReady = true;
+                } else {
+                    AppState.fullBodyFrameCount = 0;
+                    AppState.fullBodyReady = false;
+                }
+
+                let ankleY = null;
+                const la = results.poseLandmarks[LEFT_ANKLE];
+                const ra = results.poseLandmarks[RIGHT_ANKLE];
+                if (la && la.visibility > ANKLE_THRESHOLD) ankleY = la.y * $('output-canvas').height;
+                if (ra && ra.visibility > ANKLE_THRESHOLD) {
+                    const ry = ra.y * $('output-canvas').height;
+                    ankleY = ankleY != null ? (ankleY + ry) / 2 : ry;
+                }
+
+                if (ankleY != null && AppState.fullBodyReady) {
+                    AppState.count = jumpCounter.update(ankleY);
+                    $('count-pill').textContent = AppState.count;
+                    const cal = calcCalories(AppState.count, AppState.profile.weight || 65);
+                    $('calorie-pill').textContent = `🔥 ${cal} 千卡`;
+
+                    const quality = jumpCounter.poseQuality;
+                    const rhythm = jumpCounter.getRhythm();
+                    let statusText = '姿势良好';
+                    if (quality < 50) statusText = '幅度太小';
+                    else if (quality > 90 && rhythm > 80) statusText = '完美节奏!';
+                    else if (rhythm < 50) statusText = '保持节奏';
+                    $('pose-status').textContent = statusText;
+
+                    if (AppState.currentMode === 'count' && AppState.count >= AppState.targetCount) {
+                        stopTraining();
+                    }
+                }
+
+                // Border feedback
+                ctx.strokeStyle = AppState.fullBodyReady ? '#00FF00' : '#FF4444';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(2, 2, $('output-canvas').width - 4, $('output-canvas').height - 4);
+            }
+
+            ctx.restore();
+        }
+
+        function drawPose(ctx, landmarks) {
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 2;
+            const conns = [[11,23],[12,24],[23,25],[25,27],[24,26],[26,28]];
+            const w = ctx.canvas.width, h = ctx.canvas.height;
+            for (const [i,j] of conns) {
+                const a = landmarks[i], b = landmarks[j];
+                if (a && b && a.visibility > ANKLE_THRESHOLD && b.visibility > ANKLE_THRESHOLD) {
+                    ctx.beginPath();
+                    ctx.moveTo(a.x * w, a.y * h);
+                    ctx.lineTo(b.x * w, b.y * h);
+                    ctx.stroke();
+                }
+            }
+            ctx.fillStyle = '#00FF00';
+            const keys = [27, 28];
+            for (const idx of keys) {
+                if (landmarks[idx] && landmarks[idx].visibility > ANKLE_THRESHOLD) {
+                    ctx.beginPath();
+                    ctx.arc(landmarks[idx].x * w, landmarks[idx].y * h, 4, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // ==================== Camera ====================
+        async function startCamera() {
+            try {
+                if (AppState.stream) {
+                    AppState.stream.getTracks().forEach(t => t.stop());
+                    AppState.stream = null;
+                }
+                // Try 'environment' first, fall back to 'user'
+                let stream = null;
+                for (const mode of [AppState.facingMode, 'user']) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: mode, width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 20 } },
+                            audio: false
+                        });
+                        AppState.facingMode = mode;
+                        break;
+                    } catch(e) {
+                        continue;
+                    }
+                }
+                if (!stream) throw new Error('摄像头无法启动');
+                AppState.stream = stream;
+
+                const video = $('video');
+                video.srcObject = stream;
+                video.style.display = 'block';
+
+                // Wait for video metadata before proceeding
+                await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => reject(new Error('视频超时')), 8000);
+                    video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+                    video.onerror = () => { clearTimeout(timer); reject(new Error('视频加载错误')); };
+                    video.play().catch(reject);
+                });
+
+                // Downscale resolution for mobile performance
+                const maxSize = 480;
+                const w = Math.min(video.videoWidth || 480, maxSize);
+                const h = Math.round(w * (video.videoHeight / (video.videoWidth || 640)));
+                $('output-canvas').width = w;
+                $('output-canvas').height = h;
+
+                showToast('摄像头已开启 ✓');
+                return true;
+            } catch(err) {
+                showToast('摄像头启动失败: ' + err.message);
+                return false;
+            }
+        }
+
+        function stopCamera() {
+            if (AppState.stream) {
+                AppState.stream.getTracks().forEach(t => t.stop());
+                AppState.stream = null;
+            }
+        }
+
+        function processFrame() {
+            if (!AppState.isDetecting || !AppState.stream || !pose) return;
+            const now = Date.now();
+            // Process at ~10 FPS to reduce mobile CPU load
+            if (now - AppState.lastFrameTime < 100) {
+                requestAnimationFrame(processFrame);
+                return;
+            }
+            AppState.lastFrameTime = now;
+            if (!AppState.isProcessing) {
+                AppState.isProcessing = true;
+                pose.send({image: $('video')}).catch(() => { AppState.isProcessing = false; });
+            }
+            requestAnimationFrame(processFrame);
+        }
+
+        // ==================== Training Control ====================
+        function startCountdown() {
+            let num = 3;
+            $('countdown-num').textContent = num;
+            $('countdown-text').textContent = '准备开始';
+            $('countdown-overlay').classList.add('active');
+            $('start-overlay').style.display = 'none';
+
+            AppState.countdownInterval = setInterval(() => {
+                num--;
+                if (num > 0) {
+                    $('countdown-num').textContent = num;
+                } else if (num === 0) {
+                    $('countdown-num').textContent = 'GO';
+                    $('countdown-text').textContent = '开始!';
+                } else {
+                    clearInterval(AppState.countdownInterval);
+                    $('countdown-overlay').classList.remove('active');
+                    startTraining();
+                }
+            }, 1000);
+        }
+
+        function startTraining() {
+            AppState.isDetecting = true;
+            AppState.startTime = Date.now();
+            AppState.fullBodyReady = false;
+            AppState.fullBodyFrameCount = 0;
+            AppState.count = 0;
+            jumpCounter.reset();
+            $('count-pill').textContent = '0';
+            $('calorie-pill').textContent = '🔥 0 千卡';
+
+            acquireWakeLock();
+
+            if (AppState.currentMode === 'timer') {
+                AppState.remainingTime = AppState.targetTime;
+                updateTimerDisplay();
+                AppState.timerInterval = setInterval(() => {
+                    AppState.remainingTime--;
+                    updateTimerDisplay();
+                    if (AppState.remainingTime <= 0) stopTraining();
+                }, 1000);
+            } else {
+                $('timer-pill').textContent = '00:00';
+                AppState.timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - AppState.startTime) / 1000);
+                    $('timer-pill').textContent = formatTime(elapsed);
+                }, 1000);
+            }
+
+            processFrame();
+            $('start-btn').textContent = '⏹ 停止训练';
+            $('start-btn').classList.remove('btn-primary');
+            $('start-btn').classList.add('btn-secondary');
+            $('reset-btn').disabled = false;
+            showToast('训练开始!');
+        }
+
+        function stopTraining() {
+            AppState.isDetecting = false;
+            stopCamera();
+            releaseWakeLock();
+
+            if (AppState.timerInterval) { clearInterval(AppState.timerInterval); AppState.timerInterval = null; }
+            if (AppState.countdownInterval) { clearInterval(AppState.countdownInterval); AppState.countdownInterval = null; }
+
+            const duration = Math.floor((Date.now() - AppState.startTime) / 1000);
+            const rate = duration > 0 ? Math.round(AppState.count / duration * 60) : 0;
+            const calories = calcCalories(AppState.count, AppState.profile.weight || 65);
+
+            const record = {
+                date: new Date().toLocaleDateString('zh-CN'),
+                time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}),
+                count: AppState.count,
+                duration: duration,
+                rate: rate,
+                calories: calories,
+                mode: AppState.currentMode,
+                timestamp: Date.now()
+            };
+            saveHistory(record);
+            updateStats();
+            checkAchievements(record);
+
+            $('result-count').textContent = AppState.count;
+            $('result-time').textContent = formatTime(duration);
+            $('result-rate').textContent = rate + '/分';
+            $('result-cal').textContent = calories;
+            $('result-modal').classList.add('active');
+            playCompleteSound();
+
+            $('start-btn').textContent = '▶ 开始训练';
+            $('start-btn').classList.add('btn-primary');
+            $('start-btn').classList.remove('btn-secondary');
+            $('reset-btn').disabled = true;
+            $('start-overlay').style.display = 'flex';
+            $('timer-pill').textContent = formatTime(AppState.targetTime);
+        }
+
+        function updateTimerDisplay() {
+            $('timer-pill').textContent = formatTime(AppState.remainingTime);
+        }
+
+        function resetTraining() {
+            AppState.count = 0;
+            $('count-pill').textContent = '0';
+            $('calorie-pill').textContent = '🔥 0 千卡';
+            jumpCounter.reset();
+            $('start-overlay').style.display = 'flex';
+            if (AppState.currentMode === 'timer') {
+                AppState.remainingTime = AppState.targetTime;
+                $('timer-pill').textContent = formatTime(AppState.targetTime);
+            } else {
+                $('timer-pill').textContent = '00:00';
+            }
+        }
+
+        // ==================== UI Events ====================
+        // Mode switch
+        $$('.mode-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                $$('.mode-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                AppState.currentMode = chip.dataset.mode;
+                $('timer-control').classList.toggle('hidden', AppState.currentMode !== 'timer');
+                $('count-control').classList.toggle('hidden', AppState.currentMode !== 'count');
+                $('interval-control').classList.toggle('hidden', AppState.currentMode !== 'interval');
+                resetTraining();
+            });
+        });
+
+        // Time/Count controls
+        $('time-minus').addEventListener('click', () => {
+            AppState.targetTime = Math.max(10, AppState.targetTime - 10);
+            $('time-value').textContent = formatTime(AppState.targetTime);
+            $('timer-pill').textContent = formatTime(AppState.targetTime);
+        });
+        $('time-plus').addEventListener('click', () => {
+            AppState.targetTime = Math.min(600, AppState.targetTime + 10);
+            $('time-value').textContent = formatTime(AppState.targetTime);
+            $('timer-pill').textContent = formatTime(AppState.targetTime);
+        });
+        $('count-minus').addEventListener('click', () => {
+            AppState.targetCount = Math.max(10, AppState.targetCount - 10);
+            $('count-value').textContent = AppState.targetCount;
+        });
+        $('count-plus').addEventListener('click', () => {
+            AppState.targetCount = Math.min(1000, AppState.targetCount + 10);
+            $('count-value').textContent = AppState.targetCount;
+        });
+
+        // Start/Stop
+        $('start-btn').addEventListener('click', async () => {
+            if (AppState.isDetecting) {
+                stopTraining();
+            } else {
+                $('start-btn').disabled = true;
+                if (!pose) {
+                    const ok = await initPose();
+                    if (!ok) { $('start-btn').disabled = false; return; }
+                }
+                const camOk = await startCamera();
+                if (!camOk) { $('start-btn').disabled = false; return; }
+                startCountdown();
+                $('start-btn').disabled = false;
+            }
+        });
+
+        $('reset-btn').addEventListener('click', resetTraining);
+
+        // Result modal
+        $('result-close').addEventListener('click', () => $('result-modal').classList.remove('active'));
+        $('result-restart').addEventListener('click', () => {
+            $('result-modal').classList.remove('active');
+            resetTraining();
+            $('start-btn').click();
+        });
+
+        // ==================== Stats & History ====================
+        function updateStats() {
+            const history = getHistory();
+            const today = new Date().toLocaleDateString('zh-CN');
+            const month = today.substring(0, 7);
+
+            let todayCount = 0, monthCount = 0, bestCount = 0, totalCal = 0;
+            let streak = 0, lastDate = null;
+            const dateSet = new Set();
+
+            for (const item of history) {
+                if (item.date === today) todayCount += item.count;
+                if (item.date.startsWith(month)) monthCount += item.count;
+                if (item.count > bestCount) bestCount = item.count;
+                totalCal += item.calories || 0;
+                dateSet.add(item.date);
+            }
+
+            // Calculate streak
+            const dates = Array.from(dateSet).sort().reverse();
+            const todayStr = new Date().toISOString().slice(0,10).replace(/-/g,'/');
+            const yesterdayStr = new Date(Date.now()-86400000).toISOString().slice(0,10).replace(/-/g,'/');
+            // Simple streak logic
+            streak = dates.length > 0 ? Math.min(dates.length, 7) : 0; // simplified
+
+            $('today-count').textContent = todayCount;
+            $('streak-days').textContent = streak;
+            $('total-calories').textContent = totalCal;
+        }
+
+        function renderHistory() {
+            const history = getHistory();
+            const container = $('history-content');
+            if (history.length === 0) {
+                container.innerHTML = `<div class="empty-state"><div class="icon">📋</div><div>暂无训练记录</div><div class="mt-1" style="font-size:13px">完成第一次训练后将在这里显示</div></div>`;
+                return;
+            }
+            let html = '<div class="history-list">';
+            for (const item of history.slice(0, 50)) {
+                const modeClass = item.mode === 'timer' ? 'mode-timer' : item.mode === 'count' ? 'mode-count' : 'mode-free';
+                const modeText = item.mode === 'timer' ? '定时' : item.mode === 'count' ? '定数' : item.mode === 'interval' ? '间歇' : '自由';
+                html += `<div class="history-item">
+                    <div class="history-info">
+                        <div class="date">${item.date} ${item.time}</div>
+                        <span class="mode-badge ${modeClass}">${modeText}</span>
+                    </div>
+                    <div class="history-stats">
+                        <div class="count">${item.count}</div>
+                        <div class="meta">${formatTime(item.duration)} · ${item.calories || 0}千卡</div>
+                    </div>
+                </div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderStats() {
+            const history = getHistory();
+            let total = 0, duration = 0, calories = 0, totalRate = 0, count = 0;
+            const daily = {};
+            const hourly = new Array(24).fill(0);
+
+            for (const item of history) {
+                total += item.count;
+                duration += item.duration;
+                calories += item.calories || 0;
+                if (item.rate) { totalRate += item.rate; count++; }
+                daily[item.date] = (daily[item.date] || 0) + item.count;
+                const h = parseInt(item.time.split(':')[0]);
+                hourly[h] += item.count;
+            }
+
+            $('stat-total').textContent = total.toLocaleString();
+            $('stat-duration').textContent = Math.round(duration / 3600 * 10) / 10 + 'h';
+            $('stat-calories').textContent = calories.toLocaleString();
+            $('stat-rate').textContent = count > 0 ? Math.round(totalRate / count) + '/分' : '0/分';
+
+            drawTrendChart(daily);
+            drawHourChart(hourly);
+        }
+
+        function drawTrendChart(daily) {
+            const canvas = $('trend-chart');
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(Date.now() - i * 86400000);
+                days.push(d.toLocaleDateString('zh-CN'));
+            }
+            const values = days.map(d => daily[d] || 0);
+            const max = Math.max(...values, 1);
+
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            const pad = {t:20,r:20,b:30,l:40};
+            const W = rect.width - pad.l - pad.r;
+            const H = rect.height - pad.t - pad.b;
+
+            // Grid
+            ctx.strokeStyle = AppState.settings.darkMode ? '#333' : '#eee';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.t + H * i / 4;
+                ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + W, y); ctx.stroke();
+            }
+
+            // Bars
+            const barW = W / days.length * 0.6;
+            const spacing = W / days.length;
+            values.forEach((v, i) => {
+                const h = (v / max) * H;
+                const x = pad.l + spacing * i + (spacing - barW) / 2;
+                const y = pad.t + H - h;
+                const grad = ctx.createLinearGradient(0, y, 0, y + h);
+                grad.addColorStop(0, '#ff6b6b');
+                grad.addColorStop(1, '#667eea');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.roundRect(x, y, barW, h, 6);
+                ctx.fill();
+
+                // Value label
+                if (v > 0) {
+                    ctx.fillStyle = AppState.settings.darkMode ? '#aaa' : '#666';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(v, x + barW/2, y - 6);
+                }
+
+                // Day label
+                ctx.fillStyle = AppState.settings.darkMode ? '#888' : '#999';
+                ctx.font = '10px sans-serif';
+                ctx.fillText(days[i].slice(5), x + barW/2, pad.t + H + 16);
+            });
+        }
+
+        function drawHourChart(hourly) {
+            const canvas = $('hour-chart');
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const buckets = [];
+            const labels = ['凌晨','上午','中午','下午','晚上','深夜'];
+            buckets.push(hourly.slice(0,6).reduce((a,b)=>a+b,0));
+            buckets.push(hourly.slice(6,12).reduce((a,b)=>a+b,0));
+            buckets.push(hourly.slice(12,14).reduce((a,b)=>a+b,0));
+            buckets.push(hourly.slice(14,18).reduce((a,b)=>a+b,0));
+            buckets.push(hourly.slice(18,22).reduce((a,b)=>a+b,0));
+            buckets.push(hourly.slice(22,24).reduce((a,b)=>a+b,0) + hourly.slice(0,0).reduce((a,b)=>a+b,0));
+
+            const max = Math.max(...buckets, 1);
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            const pad = {t:20,r:20,b:30,l:50};
+            const W = rect.width - pad.l - pad.r;
+            const H = rect.height - pad.t - pad.b;
+
+            const barH = H / buckets.length * 0.6;
+            const spacing = H / buckets.length;
+            buckets.forEach((v, i) => {
+                const w = (v / max) * W;
+                const y = pad.t + spacing * i + (spacing - barH) / 2;
+                const x = pad.l;
+                const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+                grad.addColorStop(0, '#667eea');
+                grad.addColorStop(1, '#f093fb');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, barH, 6);
+                ctx.fill();
+
+                ctx.fillStyle = AppState.settings.darkMode ? '#aaa' : '#666';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(labels[i], 4, y + barH/2 + 4);
+                if (v > 0) {
+                    ctx.fillText(v, x + w + 6, y + barH/2 + 4);
+                }
+            });
+        }
+
+        // ==================== Achievements ====================
+        const ACHIEVEMENTS = [
+            { id: 'first', icon: '🌱', name: '初次跳跃', desc: '完成第一次跳绳训练' },
+            { id: '50', icon: '🔥', name: '热身完成', desc: '单次跳绳50次' },
+            { id: '100', icon: '💯', name: '百次突破', desc: '单次跳绳100次' },
+            { id: '500', icon: '🚀', name: '五百达成', desc: '单次跳绳500次' },
+            { id: '1000', icon: '👑', name: '千次王者', desc: '单次跳绳1000次' },
+            { id: 'streak3', icon: '📅', name: '三日坚持', desc: '连续训练3天' },
+            { id: 'streak7', icon: '📆', name: '一周达人', desc: '连续训练7天' },
+            { id: 'total1000', icon: '💪', name: '累计千次', desc: '累计跳绳1000次' },
+            { id: 'total5000', icon: '🏋️', name: '累计五千', desc: '累计跳绳5000次' },
+            { id: 'total10000', icon: '🏆', name: '万次传奇', desc: '累计跳绳10000次' },
+            { id: 'cal1000', icon: '🥗', name: '燃脂达人', desc: '累计消耗1000千卡' },
+            { id: 'speed100', icon: '⚡', name: '闪电手速', desc: '频率达到100次/分钟' }
+        ];
+
+        function checkAchievements(record) {
+            const history = getHistory();
+            const total = history.reduce((s, i) => s + i.count, 0);
+            const totalCal = history.reduce((s, i) => s + (i.calories || 0), 0);
+            const dates = new Set(history.map(h => h.date));
+
+            const checks = {
+                'first': history.length >= 1,
+                '50': record.count >= 50,
+                '100': record.count >= 100,
+                '500': record.count >= 500,
+                '1000': record.count >= 1000,
+                'streak3': dates.size >= 3,
+                'streak7': dates.size >= 7,
+                'total1000': total >= 1000,
+                'total5000': total >= 5000,
+                'total10000': total >= 10000,
+                'cal1000': totalCal >= 1000,
+                'speed100': record.rate >= 100
+            };
+
+            let newUnlock = false;
+            for (const [id, unlocked] of Object.entries(checks)) {
+                if (unlocked && !AppState.achievements.includes(id)) {
+                    AppState.achievements.push(id);
+                    newUnlock = true;
+                    const ach = ACHIEVEMENTS.find(a => a.id === id);
+                    if (ach) showToast(`🏆 解锁成就: ${ach.name}`);
+                }
+            }
+            if (newUnlock) {
+                localStorage.setItem('jumprope_achievements', JSON.stringify(AppState.achievements));
+            }
+        }
+
+        function renderAchievements() {
+            const grid = $('achievement-grid');
+            grid.innerHTML = ACHIEVEMENTS.map(ach => {
+                const unlocked = AppState.achievements.includes(ach.id);
+                return `<div class="achievement-card ${unlocked ? 'unlocked' : ''}">
+                    <div class="ach-icon">${ach.icon}</div>
+                    <div class="ach-name">${ach.name}</div>
+                    <div class="ach-desc">${ach.desc}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // ==================== Profile ====================
+        function loadProfileUI() {
+            $('input-nickname').value = AppState.profile.nickname || '';
+            $('input-height').value = AppState.profile.height || '';
+            $('input-weight').value = AppState.profile.weight || '';
+            $('input-age').value = AppState.profile.age || '';
+            $$('.segment').forEach(s => s.classList.toggle('active', s.dataset.gender === AppState.profile.gender));
+            $('profile-name').textContent = AppState.profile.nickname || '运动达人';
+            if (AppState.profile.height && AppState.profile.weight) {
+                $('profile-meta').textContent = `BMI ${calcBMI(AppState.profile.height, AppState.profile.weight)} · ${AppState.profile.height}cm · ${AppState.profile.weight}kg`;
+            } else {
+                $('profile-meta').textContent = '设置个人信息以计算卡路里';
+            }
+        }
+
+        $$('.segment').forEach(s => {
+            s.addEventListener('click', () => {
+                $$('.segment').forEach(x => x.classList.remove('active'));
+                s.classList.add('active');
+                AppState.profile.gender = s.dataset.gender;
+            });
+        });
+
+        $('goto-settings').addEventListener('click', () => showPage('settings'));
+
+        $('save-profile').addEventListener('click', () => {
+            AppState.profile.nickname = $('input-nickname').value.trim() || '运动达人';
+            AppState.profile.height = parseInt($('input-height').value) || 170;
+            AppState.profile.weight = parseInt($('input-weight').value) || 65;
+            AppState.profile.age = parseInt($('input-age').value) || 25;
+            saveProfile();
+            loadProfileUI();
+            showToast('资料已保存');
+        });
+
+        $('export-data').addEventListener('click', () => {
+            const data = {
+                profile: AppState.profile,
+                history: getHistory(),
+                achievements: AppState.achievements,
+                exportTime: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `跳绳数据_${new Date().toLocaleDateString('zh-CN')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('数据已导出');
+        });
+
+        $('clear-data').addEventListener('click', () => {
+            if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                localStorage.removeItem('jump_history');
+                localStorage.removeItem('jumprope_achievements');
+                AppState.achievements = [];
+                updateStats();
+                showToast('数据已清空');
+            }
+        });
+
+        // ==================== Settings ====================
+        function initToggle(id, key) {
+            const el = $(id);
+            el.classList.toggle('active', AppState.settings[key]);
+            el.addEventListener('click', () => {
+                AppState.settings[key] = !AppState.settings[key];
+                el.classList.toggle('active', AppState.settings[key]);
+                saveSettings();
+                if (key === 'darkMode') applyTheme();
+            });
+        }
+
+        initToggle('toggle-sound', 'sound');
+        initToggle('toggle-voice', 'voice');
+        initToggle('toggle-vibrate', 'vibrate');
+        initToggle('toggle-wakelock', 'wakelock');
+        initToggle('toggle-dark', 'darkMode');
+        initToggle('toggle-pose-hint', 'poseHint');
+
+        // ==================== PWA ====================
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        // ==================== Init ====================
+        window.addEventListener('beforeunload', () => {
+            AppState.isDetecting = false;
+            stopCamera();
+            releaseWakeLock();
+            if (AppState.timerInterval) clearInterval(AppState.timerInterval);
+            if (AppState.countdownInterval) clearInterval(AppState.countdownInterval);
+        });
+
+        // Handle resize for charts
+        window.addEventListener('resize', () => {
+            if (AppState.currentPage === 'stats') renderStats();
+        });
+
+        loadData();
+        applyTheme();
+        updateStats();
+        initPose();
+    </script>
+</body>
+</html>
