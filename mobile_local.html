@@ -1457,9 +1457,12 @@
 
         // ==================== Pose Detection ====================
         let poseLoadPromise = null;
+        let poseModuleReady = false;
 
         function loadPoseScript() {
-            if (poseLoadPromise) return poseLoadPromise;
+            if (poseModuleReady) return Promise.resolve();
+            if (poseLoadPromise && !poseLoadPromise._failed) return poseLoadPromise;
+            
             poseLoadPromise = new Promise((resolve, reject) => {
                 const cdns = [
                     'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js',
@@ -1471,6 +1474,7 @@
                 let attempt = 0;
                 function tryLoad() {
                     if (attempt >= cdns.length) {
+                        poseLoadPromise._failed = true;
                         reject(new Error('All CDNs failed'));
                         return;
                     }
@@ -1479,6 +1483,8 @@
                     script.crossOrigin = 'anonymous';
                     script.onload = () => {
                         if (typeof Pose !== 'undefined') {
+                            poseModuleReady = true;
+                            poseLoadPromise._failed = false;
                             resolve();
                         } else {
                             attempt++;
@@ -1486,14 +1492,19 @@
                         }
                     };
                     script.onerror = () => { 
+                        console.warn(`Failed to load pose.js from: ${cdns[attempt]}`);
                         attempt++; 
                         tryLoad(); 
                     };
                     document.head.appendChild(script);
                 }
                 tryLoad();
-                setTimeout(() => reject(new Error('Script load timeout')), 30000);
+                setTimeout(() => {
+                    poseLoadPromise._failed = true;
+                    reject(new Error('Script load timeout'));
+                }, 30000);
             });
+            return poseLoadPromise;
         }
 
         async function initPose() {
@@ -1530,6 +1541,9 @@
                 $('loading-overlay').style.display = 'none';
                 console.error('Pose init error:', err);
                 showToast('模型加载失败，请检查网络或稍后重试');
+                pose = null;
+                poseLoadPromise = null;
+                poseModuleReady = false;
                 return false;
             }
         }
