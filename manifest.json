@@ -2,7 +2,7 @@
   "name": "AI跳绳计数器 Pro",
   "short_name": "AI跳绳Pro",
   "description": "基于AI姿态识别的专业跳绳计数应用",
-  "start_url": "mobile_local.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#ff6b6b",

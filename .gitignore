@@ -7,3 +7,11 @@ __pycache__/
 *.py
 ssl/
 static/
+download_models.py
+download_mediapipe.py
+fusion_system.py
+gui_app.py
+main.py
+mobile_app.py
+pose_estimator.py
+jump_counter.py

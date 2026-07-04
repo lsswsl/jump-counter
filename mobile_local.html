@@ -1625,52 +1625,87 @@
         }
 
         // ==================== Camera ====================
+        async function checkCameraPermission() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return { granted: false, error: '浏览器不支持摄像头访问' };
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                stream.getTracks().forEach(t => t.stop());
+                return { granted: true };
+            } catch(err) {
+                return { granted: false, error: err.name + ': ' + err.message };
+            }
+        }
+
         async function startCamera() {
             try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showToast('您的浏览器不支持摄像头功能');
+                    return false;
+                }
+
                 if (AppState.stream) {
                     AppState.stream.getTracks().forEach(t => t.stop());
                     AppState.stream = null;
                 }
-                // Try 'environment' first, fall back to 'user'
+
                 let stream = null;
-                for (const mode of [AppState.facingMode, 'user']) {
+                const constraintsList = [
+                    { video: { facingMode: AppState.facingMode, width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 15 } }, audio: false },
+                    { video: { facingMode: AppState.facingMode }, audio: false },
+                    { video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 15 } }, audio: false },
+                    { video: { facingMode: 'user' }, audio: false },
+                    { video: true, audio: false }
+                ];
+
+                for (const constraints of constraintsList) {
                     try {
-                        stream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: mode, width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 20 } },
-                            audio: false
-                        });
-                        AppState.facingMode = mode;
-                        break;
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        if (stream.getVideoTracks().length > 0) {
+                            const settings = stream.getVideoTracks()[0].getSettings();
+                            AppState.facingMode = settings.facingMode || (constraints.video.facingMode || 'environment');
+                            break;
+                        }
                     } catch(e) {
                         continue;
                     }
                 }
-                if (!stream) throw new Error('摄像头无法启动');
-                AppState.stream = stream;
 
+                if (!stream) {
+                    showToast('无法访问摄像头，请检查权限设置');
+                    return false;
+                }
+
+                AppState.stream = stream;
                 const video = $('video');
                 video.srcObject = stream;
                 video.style.display = 'block';
 
-                // Wait for video metadata before proceeding
                 await new Promise((resolve, reject) => {
-                    const timer = setTimeout(() => reject(new Error('视频超时')), 8000);
+                    const timer = setTimeout(() => reject(new Error('视频初始化超时')), 10000);
                     video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
-                    video.onerror = () => { clearTimeout(timer); reject(new Error('视频加载错误')); };
-                    video.play().catch(reject);
+                    video.onerror = () => { clearTimeout(timer); reject(new Error('视频加载失败')); };
+                    video.play().then(resolve).catch(reject);
                 });
 
-                // Downscale resolution for mobile performance
                 const maxSize = 480;
                 const w = Math.min(video.videoWidth || 480, maxSize);
-                const h = Math.round(w * (video.videoHeight / (video.videoWidth || 640)));
+                const h = Math.round(w * ((video.videoHeight || 640) / (video.videoWidth || 480)));
                 $('output-canvas').width = w;
                 $('output-canvas').height = h;
 
                 showToast('摄像头已开启 ✓');
                 return true;
             } catch(err) {
-                showToast('摄像头启动失败: ' + err.message);
+                console.error('Camera error:', err);
+                let msg = '摄像头启动失败';
+                if (err.name === 'NotAllowedError') msg = '请允许摄像头权限';
+                else if (err.name === 'NotFoundError') msg = '未检测到摄像头设备';
+                else if (err.name === 'NotReadableError') msg = '摄像头被其他应用占用';
+                else if (err.name === 'SecurityError') msg = '安全策略阻止摄像头访问';
+                else msg += ': ' + err.message;
+                showToast(msg);
                 return false;
             }
         }
