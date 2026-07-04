@@ -1461,10 +1461,11 @@
         function loadPoseScript() {
             if (poseLoadPromise) return poseLoadPromise;
             poseLoadPromise = new Promise((resolve, reject) => {
-                // Try CDNs in order
                 const cdns = [
-                    'https://unpkg.com/@mediapipe/pose/pose.js',
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js',
+                    'https://unpkg.com/@mediapipe/pose@0.5.1675469404/pose.js',
                     'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
+                    'https://unpkg.com/@mediapipe/pose/pose.js',
                     'https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.3.1620932931/pose.js'
                 ];
                 let attempt = 0;
@@ -1476,13 +1477,22 @@
                     const script = document.createElement('script');
                     script.src = cdns[attempt];
                     script.crossOrigin = 'anonymous';
-                    script.onload = resolve;
-                    script.onerror = () => { attempt++; tryLoad(); };
+                    script.onload = () => {
+                        if (typeof Pose !== 'undefined') {
+                            resolve();
+                        } else {
+                            attempt++;
+                            tryLoad();
+                        }
+                    };
+                    script.onerror = () => { 
+                        attempt++; 
+                        tryLoad(); 
+                    };
                     document.head.appendChild(script);
                 }
                 tryLoad();
-                // Timeout after 15s
-                setTimeout(() => reject(new Error('Script load timeout')), 15000);
+                setTimeout(() => reject(new Error('Script load timeout')), 30000);
             });
         }
 
@@ -1491,9 +1501,20 @@
                 $('loading-overlay').style.display = 'flex';
                 await loadPoseScript();
                 if (typeof Pose === 'undefined') {
-                    throw new Error('Pose not available after script load');
+                    throw new Error('Pose class not available');
                 }
-                pose = new Pose({locateFile: (file) => `https://unpkg.com/@mediapipe/pose/${file}`});
+                
+                const locateFile = (file) => {
+                    const sources = [
+                        `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`,
+                        `https://unpkg.com/@mediapipe/pose@0.5.1675469404/${file}`,
+                        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+                        `https://unpkg.com/@mediapipe/pose/${file}`
+                    ];
+                    return sources[0];
+                };
+                
+                pose = new Pose({locateFile: locateFile});
                 pose.setOptions({
                     modelComplexity: 0,
                     smoothLandmarks: true,
@@ -1503,10 +1524,12 @@
                 });
                 pose.onResults(onPoseResults);
                 $('loading-overlay').style.display = 'none';
+                showToast('模型加载成功');
                 return true;
             } catch(err) {
                 $('loading-overlay').style.display = 'none';
-                showToast('模型加载失败，请检查网络连接');
+                console.error('Pose init error:', err);
+                showToast('模型加载失败，请检查网络或稍后重试');
                 return false;
             }
         }
