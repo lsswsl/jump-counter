@@ -1,7 +1,11 @@
-const CACHE_NAME = 'jumprope-pro-v1';
+const CACHE_NAME = 'jumprope-pro-v2';
 const STATIC_ASSETS = [
-  '/mobile_local.html',
-  '/manifest.json'
+  './',
+  './index.html',
+  './mobile_local.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 // Install: cache static assets
@@ -56,7 +60,7 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => {
         // Fallback for HTML requests when offline
         if (request.headers.get('accept').includes('text/html')) {
-          return caches.match('/mobile_local.html');
+          return caches.match('./mobile_local.html');
         }
       });
     })
