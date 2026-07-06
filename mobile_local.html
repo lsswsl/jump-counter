@@ -1236,7 +1236,7 @@
 
         // ==================== Jump Counter ====================
         class JumpCounter {
-            constructor(fps=15, minInterval=2, minAmplitude=3) {
+            constructor(fps=15, minInterval=4, minAmplitude=6) {
                 this.fps = fps;
                 this.minInterval = minInterval;
                 this.minAmplitude = minAmplitude;
@@ -1248,8 +1248,8 @@
                 this.lastValidY = null;
                 this.lastPeakY = null;
                 this.isInAir = false;
-                this.dropThreshold = 1;
-                this.airEntryThreshold = 2;
+                this.dropThreshold = 2;
+                this.airEntryThreshold = 3;
                 this.fallbackMultiplier = 2;
                 this.poseQuality = 100;
                 this.rhythmScore = 0;
@@ -1298,20 +1298,19 @@
 
             detectJumpSimple() {
                 const len = this.smoothHistory.length;
-                if (len < 5) return;
+                if (len < 6) return;
 
                 const currentY = this.smoothHistory[len-1];
                 const prevY = this.smoothHistory[len-2];
                 const prev2Y = this.smoothHistory[len-3];
                 const prev3Y = this.smoothHistory[len-4];
 
-                const isPeak = prevY < prev2Y && prevY < currentY;
-                const isValley = prevY > prev2Y && prevY > currentY;
+                const isPeak = prevY < prev2Y && prevY < currentY && prev2Y < prev3Y;
+                const isValley = prevY > prev2Y && prevY > currentY && prev2Y > prev3Y;
 
                 const diff = Math.abs(currentY - prevY);
-                const recentDiff = len >= 5 ? Math.abs(this.smoothHistory[len-1] - this.smoothHistory[len-5]) : 0;
 
-                if (isPeak && !this.isInAir && diff > this.minAmplitude * 0.5) {
+                if (isPeak && !this.isInAir && diff > this.minAmplitude * 0.6) {
                     this.isInAir = true;
                     this.lastPeakY = prevY;
                 }
@@ -1325,7 +1324,7 @@
                         const drop = prevY - this.lastPeakY;
                         const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
 
-                        if (timeOk && drop > this.dropThreshold) {
+                        if (timeOk && drop > this.minAmplitude) {
                             this.count++;
                             this.lastCountFrame = this.frameCount;
                             this.jumpIntervals.push(this.frameCount);
@@ -1334,17 +1333,6 @@
                         }
                         this.isInAir = false;
                         this.lastPeakY = null;
-                    }
-                }
-
-                if (!this.isInAir && recentDiff > this.minAmplitude && (this.frameCount - this.lastCountFrame) > this.minInterval) {
-                    const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
-                    if (timeOk) {
-                        this.count++;
-                        this.lastCountFrame = this.frameCount;
-                        this.jumpIntervals.push(this.frameCount);
-                        if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
-                        onJumpDetected();
                     }
                 }
             }
