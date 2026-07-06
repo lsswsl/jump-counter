@@ -1141,9 +1141,11 @@
         };
 
         const FULL_BODY_LANDMARKS = [11, 12, 23, 24, 25, 26, 27, 28];
-        const ANKLE_THRESHOLD = 0.3;
+        const ANKLE_THRESHOLD = 0.2;
         const LEFT_ANKLE = 27;
         const RIGHT_ANKLE = 28;
+        const LEFT_WRIST = 15;
+        const RIGHT_WRIST = 16;
 
         // ==================== DOM Elements ====================
         const $ = id => document.getElementById(id);
@@ -1234,7 +1236,7 @@
 
         // ==================== Jump Counter ====================
         class JumpCounter {
-            constructor(fps=15, minInterval=2, minAmplitude=4) {
+            constructor(fps=15, minInterval=2, minAmplitude=3) {
                 this.fps = fps;
                 this.minInterval = minInterval;
                 this.minAmplitude = minAmplitude;
@@ -1246,9 +1248,9 @@
                 this.lastValidY = null;
                 this.lastPeakY = null;
                 this.isInAir = false;
-                this.dropThreshold = minAmplitude * 0.3;
-                this.airEntryThreshold = minAmplitude * 0.5;
-                this.fallbackMultiplier = 3;
+                this.dropThreshold = 1;
+                this.airEntryThreshold = 2;
+                this.fallbackMultiplier = 2;
                 this.poseQuality = 100;
                 this.rhythmScore = 0;
                 this.jumpIntervals = [];
@@ -1296,35 +1298,31 @@
 
             detectJumpSimple() {
                 const len = this.smoothHistory.length;
-                if (len < 6) return;
+                if (len < 5) return;
 
                 const currentY = this.smoothHistory[len-1];
                 const prevY = this.smoothHistory[len-2];
                 const prev2Y = this.smoothHistory[len-3];
+                const prev3Y = this.smoothHistory[len-4];
 
-                const recent = this.smoothHistory.slice(-15);
-                const maxY = Math.max(...recent);
-                const minY = Math.min(...recent);
-                const range = maxY - minY;
+                const isPeak = prevY < prev2Y && prevY < currentY;
+                const isValley = prevY > prev2Y && prevY > currentY;
 
-                const isGoingUp = currentY < prevY && prevY < prev2Y;
-                const isGoingDown = currentY > prevY && prevY > prev2Y;
+                const diff = Math.abs(currentY - prevY);
+                const recentDiff = len >= 5 ? Math.abs(this.smoothHistory[len-1] - this.smoothHistory[len-5]) : 0;
 
-                const simpleUp = currentY < prevY - 1;
-                const simpleDown = currentY > prevY + 1;
-
-                if (!this.isInAir && (isGoingUp || simpleUp) && range > this.airEntryThreshold) {
+                if (isPeak && !this.isInAir && diff > this.minAmplitude * 0.5) {
                     this.isInAir = true;
-                    this.lastPeakY = currentY;
+                    this.lastPeakY = prevY;
                 }
 
                 if (this.isInAir) {
-                    if (this.lastPeakY == null || currentY < this.lastPeakY) {
-                        this.lastPeakY = currentY;
+                    if (this.lastPeakY == null || prevY < this.lastPeakY) {
+                        this.lastPeakY = prevY;
                     }
 
-                    if ((isGoingDown || simpleDown) && this.lastPeakY != null) {
-                        const drop = currentY - this.lastPeakY;
+                    if (isValley && this.lastPeakY != null) {
+                        const drop = prevY - this.lastPeakY;
                         const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
 
                         if (timeOk && drop > this.dropThreshold) {
@@ -1339,18 +1337,15 @@
                     }
                 }
 
-                const sinceLast = this.frameCount - this.lastCountFrame;
-                if (sinceLast > this.minInterval * this.fallbackMultiplier && this.isInAir && this.lastPeakY != null) {
-                    const drop = currentY - this.lastPeakY;
-                    if (drop > this.dropThreshold) {
+                if (!this.isInAir && recentDiff > this.minAmplitude && (this.frameCount - this.lastCountFrame) > this.minInterval) {
+                    const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
+                    if (timeOk) {
                         this.count++;
                         this.lastCountFrame = this.frameCount;
                         this.jumpIntervals.push(this.frameCount);
                         if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
                         onJumpDetected();
                     }
-                    this.isInAir = false;
-                    this.lastPeakY = null;
                 }
             }
 
@@ -1590,9 +1585,20 @@
                     ankleY = ankleY != null ? (ankleY + ry) / 2 : ry;
                 }
 
-                if (ankleY != null) {
-                    console.log(`Ankle Y: ${ankleY.toFixed(1)}, Count: ${AppState.count}`);
-                    AppState.count = jumpCounter.update(ankleY);
+                let wristY = null;
+                const lw = results.poseLandmarks[LEFT_WRIST];
+                const rw = results.poseLandmarks[RIGHT_WRIST];
+                if (lw && lw.visibility > ANKLE_THRESHOLD) wristY = lw.y * $('output-canvas').height;
+                if (rw && rw.visibility > ANKLE_THRESHOLD) {
+                    const wy = rw.y * $('output-canvas').height;
+                    wristY = wristY != null ? (wristY + wy) / 2 : wy;
+                }
+
+                let trackingY = ankleY != null ? ankleY : wristY;
+
+                if (trackingY != null) {
+                    console.log(`Tracking Y: ${trackingY.toFixed(1)}, Count: ${AppState.count}`);
+                    AppState.count = jumpCounter.update(trackingY);
                     $('count-pill').textContent = AppState.count;
                     const cal = calcCalories(AppState.count, AppState.profile.weight || 65);
                     $('calorie-pill').textContent = `🔥 ${cal} 千卡`;
