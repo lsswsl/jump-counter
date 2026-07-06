@@ -1234,7 +1234,7 @@
 
         // ==================== Jump Counter ====================
         class JumpCounter {
-            constructor(fps=15, minInterval=3, minAmplitude=8) {
+            constructor(fps=15, minInterval=2, minAmplitude=4) {
                 this.fps = fps;
                 this.minInterval = minInterval;
                 this.minAmplitude = minAmplitude;
@@ -1246,9 +1246,9 @@
                 this.lastValidY = null;
                 this.lastPeakY = null;
                 this.isInAir = false;
-                this.dropThreshold = minAmplitude * 0.2;
-                this.airEntryThreshold = minAmplitude * 0.25;
-                this.fallbackMultiplier = 2;
+                this.dropThreshold = minAmplitude * 0.3;
+                this.airEntryThreshold = minAmplitude * 0.5;
+                this.fallbackMultiplier = 3;
                 this.poseQuality = 100;
                 this.rhythmScore = 0;
                 this.jumpIntervals = [];
@@ -1268,13 +1268,13 @@
 
                 // Pose quality based on amplitude consistency
                 if (this.smoothHistory.length >= 10) {
-                    const recent = this.smoothHistory.slice(-20);
+                    const recent = this.smoothHistory.slice(-15);
                     const ranges = [];
                     for (let i = 1; i < recent.length; i++) {
                         ranges.push(Math.abs(recent[i] - recent[i-1]));
                     }
                     const avgRange = ranges.reduce((a,b) => a+b, 0) / ranges.length;
-                    this.poseQuality = Math.min(100, Math.max(30, Math.round(avgRange * 2)));
+                    this.poseQuality = Math.min(100, Math.max(40, Math.round(avgRange * 5)));
                 }
 
                 return this.count;
@@ -1296,28 +1296,26 @@
 
             detectJumpSimple() {
                 const len = this.smoothHistory.length;
-                if (len < 8) return;
+                if (len < 6) return;
 
                 const currentY = this.smoothHistory[len-1];
                 const prevY = this.smoothHistory[len-2];
                 const prev2Y = this.smoothHistory[len-3];
-                const prev3Y = this.smoothHistory[len-4];
-                const prev4Y = this.smoothHistory[len-5];
 
-                const recent = this.smoothHistory.slice(-20);
+                const recent = this.smoothHistory.slice(-15);
                 const maxY = Math.max(...recent);
                 const minY = Math.min(...recent);
                 const range = maxY - minY;
 
-                const isPeak = currentY < prevY && prevY < prev2Y && prev2Y > prev3Y && prev2Y > prev4Y;
-                const isValley = currentY > prevY && prevY > prev2Y && prev2Y < prev3Y && prev2Y < prev4Y;
+                const isGoingUp = currentY < prevY && prevY < prev2Y;
+                const isGoingDown = currentY > prevY && prevY > prev2Y;
 
-                const simpleUp = currentY < prevY - 2;
-                const simpleDown = currentY > prevY + 2;
+                const simpleUp = currentY < prevY - 1;
+                const simpleDown = currentY > prevY + 1;
 
-                if (!this.isInAir && (isPeak || simpleUp) && range > this.minAmplitude * 0.5) {
+                if (!this.isInAir && (isGoingUp || simpleUp) && range > this.airEntryThreshold) {
                     this.isInAir = true;
-                    this.lastPeakY = prev2Y;
+                    this.lastPeakY = currentY;
                 }
 
                 if (this.isInAir) {
@@ -1325,11 +1323,11 @@
                         this.lastPeakY = currentY;
                     }
 
-                    if ((isValley || simpleDown) && this.lastPeakY != null) {
+                    if ((isGoingDown || simpleDown) && this.lastPeakY != null) {
                         const drop = currentY - this.lastPeakY;
                         const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
 
-                        if (timeOk && drop > this.minAmplitude) {
+                        if (timeOk && drop > this.dropThreshold) {
                             this.count++;
                             this.lastCountFrame = this.frameCount;
                             this.jumpIntervals.push(this.frameCount);
@@ -1344,7 +1342,7 @@
                 const sinceLast = this.frameCount - this.lastCountFrame;
                 if (sinceLast > this.minInterval * this.fallbackMultiplier && this.isInAir && this.lastPeakY != null) {
                     const drop = currentY - this.lastPeakY;
-                    if (drop > this.minAmplitude * 0.6) {
+                    if (drop > this.dropThreshold) {
                         this.count++;
                         this.lastCountFrame = this.frameCount;
                         this.jumpIntervals.push(this.frameCount);
