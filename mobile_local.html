@@ -1296,48 +1296,55 @@
 
             detectJumpSimple() {
                 const len = this.smoothHistory.length;
+                if (len < 8) return;
+
                 const currentY = this.smoothHistory[len-1];
                 const prevY = this.smoothHistory[len-2];
                 const prev2Y = this.smoothHistory[len-3];
+                const prev3Y = this.smoothHistory[len-4];
+                const prev4Y = this.smoothHistory[len-5];
 
-                const recent = this.smoothHistory.slice(-15);
-                const range = Math.max(...recent) - Math.min(...recent);
-                const isGoingUp = currentY < prevY && prevY < prev2Y;
-                const isGoingDown = currentY > prevY && prevY > prev2Y;
+                const recent = this.smoothHistory.slice(-20);
+                const maxY = Math.max(...recent);
+                const minY = Math.min(...recent);
+                const range = maxY - minY;
 
-                const simpleUp = currentY < prevY - 1;
-                const simpleDown = currentY > prevY + 1;
+                const isPeak = currentY < prevY && prevY < prev2Y && prev2Y > prev3Y && prev2Y > prev4Y;
+                const isValley = currentY > prevY && prevY > prev2Y && prev2Y < prev3Y && prev2Y < prev4Y;
 
-                if (!this.isInAir && (isGoingUp || simpleUp) && range > this.airEntryThreshold) {
+                const simpleUp = currentY < prevY - 2;
+                const simpleDown = currentY > prevY + 2;
+
+                if (!this.isInAir && (isPeak || simpleUp) && range > this.minAmplitude * 0.5) {
                     this.isInAir = true;
-                    this.lastPeakY = null;
+                    this.lastPeakY = prev2Y;
                 }
 
                 if (this.isInAir) {
                     if (this.lastPeakY == null || currentY < this.lastPeakY) {
                         this.lastPeakY = currentY;
                     }
-                    if ((isGoingDown || simpleDown) && this.lastPeakY != null) {
+
+                    if ((isValley || simpleDown) && this.lastPeakY != null) {
                         const drop = currentY - this.lastPeakY;
-                        if (drop > this.dropThreshold) {
-                            const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
-                            if (timeOk && (drop > this.minAmplitude || this.count === 0)) {
-                                this.count++;
-                                this.lastCountFrame = this.frameCount;
-                                this.jumpIntervals.push(this.frameCount);
-                                if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
-                                onJumpDetected();
-                            }
-                            this.isInAir = false;
-                            this.lastPeakY = null;
+                        const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
+
+                        if (timeOk && drop > this.minAmplitude) {
+                            this.count++;
+                            this.lastCountFrame = this.frameCount;
+                            this.jumpIntervals.push(this.frameCount);
+                            if (this.jumpIntervals.length > 10) this.jumpIntervals.shift();
+                            onJumpDetected();
                         }
+                        this.isInAir = false;
+                        this.lastPeakY = null;
                     }
                 }
 
                 const sinceLast = this.frameCount - this.lastCountFrame;
                 if (sinceLast > this.minInterval * this.fallbackMultiplier && this.isInAir && this.lastPeakY != null) {
                     const drop = currentY - this.lastPeakY;
-                    if (drop > this.minAmplitude * 0.5) {
+                    if (drop > this.minAmplitude * 0.6) {
                         this.count++;
                         this.lastCountFrame = this.frameCount;
                         this.jumpIntervals.push(this.frameCount);
@@ -1562,6 +1569,8 @@
             ctx.save();
             ctx.clearRect(0, 0, $('output-canvas').width, $('output-canvas').height);
 
+            ctx.drawImage($('video'), 0, 0, $('output-canvas').width, $('output-canvas').height);
+
             if (results.poseLandmarks) {
                 drawPose(ctx, results.poseLandmarks);
 
@@ -1584,6 +1593,7 @@
                 }
 
                 if (ankleY != null) {
+                    console.log(`Ankle Y: ${ankleY.toFixed(1)}, Count: ${AppState.count}`);
                     AppState.count = jumpCounter.update(ankleY);
                     $('count-pill').textContent = AppState.count;
                     const cal = calcCalories(AppState.count, AppState.profile.weight || 65);
@@ -1691,7 +1701,7 @@
                 AppState.stream = stream;
                 const video = $('video');
                 video.srcObject = stream;
-                video.style.display = 'block';
+                video.style.display = 'none';
 
                 await new Promise((resolve, reject) => {
                     const timer = setTimeout(() => reject(new Error('视频初始化超时')), 10000);
