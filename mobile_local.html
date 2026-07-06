@@ -1140,8 +1140,8 @@
             achievements: []
         };
 
-        const FULL_BODY_LANDMARKS = [0, 11, 12, 23, 24, 25, 26, 27, 28];
-        const ANKLE_THRESHOLD = 0.5;
+        const FULL_BODY_LANDMARKS = [11, 12, 23, 24, 25, 26, 27, 28];
+        const ANKLE_THRESHOLD = 0.3;
         const LEFT_ANKLE = 27;
         const RIGHT_ANKLE = 28;
 
@@ -1234,7 +1234,7 @@
 
         // ==================== Jump Counter ====================
         class JumpCounter {
-            constructor(fps=15, minInterval=4, minAmplitude=10) {
+            constructor(fps=15, minInterval=3, minAmplitude=8) {
                 this.fps = fps;
                 this.minInterval = minInterval;
                 this.minAmplitude = minAmplitude;
@@ -1246,9 +1246,9 @@
                 this.lastValidY = null;
                 this.lastPeakY = null;
                 this.isInAir = false;
-                this.dropThreshold = minAmplitude * 0.25;
-                this.airEntryThreshold = minAmplitude * 0.3;
-                this.fallbackMultiplier = 1.5;
+                this.dropThreshold = minAmplitude * 0.2;
+                this.airEntryThreshold = minAmplitude * 0.25;
+                this.fallbackMultiplier = 2;
                 this.poseQuality = 100;
                 this.rhythmScore = 0;
                 this.jumpIntervals = [];
@@ -1300,28 +1300,27 @@
                 const prevY = this.smoothHistory[len-2];
                 const prev2Y = this.smoothHistory[len-3];
 
-                const recent = this.smoothHistory.slice(-12);
+                const recent = this.smoothHistory.slice(-15);
                 const range = Math.max(...recent) - Math.min(...recent);
                 const isGoingUp = currentY < prevY && prevY < prev2Y;
                 const isGoingDown = currentY > prevY && prevY > prev2Y;
 
-                // Enter air state on upward movement with smaller threshold
-                if (!this.isInAir && isGoingUp && range > this.airEntryThreshold) {
+                const simpleUp = currentY < prevY - 1;
+                const simpleDown = currentY > prevY + 1;
+
+                if (!this.isInAir && (isGoingUp || simpleUp) && range > this.airEntryThreshold) {
                     this.isInAir = true;
                     this.lastPeakY = null;
                 }
 
                 if (this.isInAir) {
-                    // Track the highest point (lowest Y value)
                     if (this.lastPeakY == null || currentY < this.lastPeakY) {
                         this.lastPeakY = currentY;
                     }
-                    // Detect landing: downward movement after peak
-                    if (isGoingDown && this.lastPeakY != null) {
+                    if ((isGoingDown || simpleDown) && this.lastPeakY != null) {
                         const drop = currentY - this.lastPeakY;
                         if (drop > this.dropThreshold) {
                             const timeOk = (this.frameCount - this.lastCountFrame) > this.minInterval;
-                            // Count jump if drop exceeds minimum amplitude or time is sufficient
                             if (timeOk && (drop > this.minAmplitude || this.count === 0)) {
                                 this.count++;
                                 this.lastCountFrame = this.frameCount;
@@ -1335,11 +1334,10 @@
                     }
                 }
 
-                // Fallback: count if stuck in air too long and peak-drop is sufficient
                 const sinceLast = this.frameCount - this.lastCountFrame;
                 if (sinceLast > this.minInterval * this.fallbackMultiplier && this.isInAir && this.lastPeakY != null) {
                     const drop = currentY - this.lastPeakY;
-                    if (drop > this.minAmplitude * 0.8) {
+                    if (drop > this.minAmplitude * 0.5) {
                         this.count++;
                         this.lastCountFrame = this.frameCount;
                         this.jumpIntervals.push(this.frameCount);
@@ -1553,7 +1551,7 @@
             for (const idx of FULL_BODY_LANDMARKS) {
                 if (landmarks[idx] && landmarks[idx].visibility > ANKLE_THRESHOLD) visible++;
             }
-            return visible >= FULL_BODY_LANDMARKS.length - 1;
+            return visible >= Math.floor(FULL_BODY_LANDMARKS.length * 0.5);
         }
 
         function onPoseResults(results) {
@@ -1570,7 +1568,7 @@
                 const fullBody = checkFullBody(results.poseLandmarks);
                 if (fullBody) {
                     AppState.fullBodyFrameCount++;
-                    if (AppState.fullBodyFrameCount >= 5) AppState.fullBodyReady = true;
+                    if (AppState.fullBodyFrameCount >= 2) AppState.fullBodyReady = true;
                 } else {
                     AppState.fullBodyFrameCount = 0;
                     AppState.fullBodyReady = false;
@@ -1585,7 +1583,7 @@
                     ankleY = ankleY != null ? (ankleY + ry) / 2 : ry;
                 }
 
-                if (ankleY != null && AppState.fullBodyReady) {
+                if (ankleY != null) {
                     AppState.count = jumpCounter.update(ankleY);
                     $('count-pill').textContent = AppState.count;
                     const cal = calcCalories(AppState.count, AppState.profile.weight || 65);
@@ -1604,7 +1602,6 @@
                     }
                 }
 
-                // Border feedback
                 ctx.strokeStyle = AppState.fullBodyReady ? '#00FF00' : '#FF4444';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(2, 2, $('output-canvas').width - 4, $('output-canvas').height - 4);
